@@ -1,0 +1,22 @@
+{
+    "send_interval" : 5,
+
+    "receivers": [
+        "example2@gmail.com",
+        "example3@domain.com"
+    ],
+
+    "email": {
+        "service": "gmail",
+        "auth": {
+            "user": "yourEmailHere",
+            "pass": "yourPasswordHere"
+        },
+        "options": {
+            "from": "yourEmailHere",
+            "to": "{email}",
+            "subject": "EmailSubjectHere",
+            "text": "Email message here. <p style='color: red;'>Support html!</p>"
+        }
+    }
+}
