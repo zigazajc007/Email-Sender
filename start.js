@@ -15,58 +15,54 @@ console.log("\x1b[34m","╚══════╝╚═╝     ╚═╝╚═╝
 
 fs.readFile('./settings.json', 'utf8', (err, data) => {
 
-    if (err) {
-        console.log(`Error reading json file: ${err}`);
-    } else {
+	if (err) {
+		console.log(`Error reading json file: ${err}`);
+	}else{
+		settings = JSON.parse(data);
+		console.log("\x1b[34m", "Email will be sent to: \n")
 
-        settings = JSON.parse(data);
+		for(var i = 0; i < settings["receivers"].length; i++){
+			console.log("\x1b[34m", settings["receivers"][i])
+			emails.push(settings["receivers"][i]);
+		}
 
-        console.log("\x1b[34m", "Email will be sent to: \n")
+		transporter = nodemailer.createTransport({
+			host: settings["email"]["host"],
+			port: settings["email"]["port"],
+			secure: settings["email"]["secure"],
+			auth: {
+				user: settings["email"]["auth"]["user"],
+				pass: settings["email"]["auth"]["pass"],
+			},
+		});
 
-        for(var i = 0; i < settings["receivers"].length; i++){
-            console.log("\x1b[34m", settings["receivers"][i])
-            emails.push(settings["receivers"][i]);
-        }
+		const interval = setInterval(function() {
+			send_email();
+		}, settings["send_interval"]*1000);
 
-        console.log();
-
-        transporter = nodemailer.createTransport({
-            service: settings["email"]["service"],
-            auth: {
-              user: settings["email"]["auth"]["user"],
-              pass: settings["email"]["auth"]["pass"]
-            }
-        });
-
-        const interval = setInterval(function() {
-            send_email();
-        }, settings["send_interval"]*1000);
-
-    }
-
+	}
 });
 
 function send_email(){
-    if(emails[0] != null){
-        transporter.sendMail(getMailOptions(emails[0]), function(error, info){
-            if (error){
-                console.log("\x1b[31m", "[" + new Date().toLocaleString() + "] Error: Email can't be sent. Please check if your username and password are correct and also if you have enabled access for less secure applications in Gmail.");
-                console.log("\x1b[31m", "Link: https://support.google.com/mail/?p=BadCredentials");
-            }else{
-                console.log("\x1b[34m", "[" + new Date().toLocaleString() + "] Email to " + emails[0] + " is sent!");
-                emails.splice(0, 1);
-            }
-        });
-    }else{
-        console.log("\x1b[33m", "All emails has been sent.");
-    }
+	if(emails[0] != null){
+		transporter.sendMail(getMailOptions(emails[0]), function(error, info){
+			if (error){
+				console.log("\x1b[31m", "[" + new Date().toLocaleString() + "] Error: " + error);
+			}else{
+				console.log("\x1b[34m", "[" + new Date().toLocaleString() + "] Email to " + emails[0] + " is sent!");
+				emails.splice(0, 1);
+			}
+		});
+	}else{
+		console.log("\x1b[33m", "All emails has been sent.");
+	}
 }
 
 function getMailOptions(receiver){
-    return mailOptions = {
-        from: settings["email"]["options"]["from"],
-        to: settings["email"]["options"]["to"].replace("{email}", receiver),
-        subject: settings["email"]["options"]["subject"],
-        html: settings["email"]["options"]["text"]
-    };
+	return mailOptions = {
+		from: settings["email"]["options"]["from"],
+		to: settings["email"]["options"]["to"].replace("{email}", receiver),
+		subject: settings["email"]["options"]["subject"],
+		html: settings["email"]["options"]["text"]
+	};
 }
