@@ -1,7 +1,7 @@
 {
   "name": "email-sender",
   "description": "Email-Sender allows you to send the same email to multiple users separately. So that means every delivered email won't include multiple recipients. As a result, this will improve privacy and security.",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "main": "start.js",
   "devDependencies": {},
   "scripts": {
@@ -18,7 +18,7 @@
   },
   "homepage": "https://github.com/zigazajc007/Email-Sender#readme",
   "dependencies": {
-    "fs": "^0.0.1-security",
-    "nodemailer": "^6.7.2"
+    "nodemailer": "^6.7.8",
+    "dotenv": "^16.0.1"
   }
 }
