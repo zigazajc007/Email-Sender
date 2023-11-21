@@ -72,13 +72,13 @@ let total = receivers.length;
 
 // Receiver filtering
 console.log("\x1b[32m", "Receivers:\n");
-console.log("\x1b[34m", "  Unfiltered: \x1b[35m" + total);
+console.log("\x1b[34m", "  Initial Count (Before Filters): \x1b[35m" + total);
 receivers = receivers.filter(receiver => validator.isEmail(receiver)).map(email => email.toLowerCase());;
-console.log("\x1b[34m", "    - Invalid: \x1b[35m" + (total - receivers.length));
+console.log("\x1b[34m", "    - Invalid Filtered Out: \x1b[35m" + (total - receivers.length));
 total = receivers.length;
 receivers = [...new Set(receivers)];
-console.log("\x1b[34m", "    - Duplicates: \x1b[35m" + (total - receivers.length));
-console.log("\x1b[34m", "  Filtered: \x1b[35m" + receivers.length + "\n");
+console.log("\x1b[34m", "    - Duplicates Removed: \x1b[35m" + (total - receivers.length) + "\n");
+console.log("\x1b[34m", "  Final Count (After Filters): \x1b[35m" + receivers.length + "\n");
 
 // Providers
 console.log("\x1b[32m", "Providers:\n");
