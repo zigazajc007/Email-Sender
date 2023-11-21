@@ -1,21 +1,29 @@
-require('dotenv').config();
-const fs = require('fs');
-const nodemailer = require('nodemailer');
+import dotenv from 'dotenv';
+import { promises as fs } from 'fs';
+import nodemailer from 'nodemailer';
+import validator from 'validator';
+
+dotenv.config();
+
+const debug = (process.env.DEBUG_MODE === 'true');
 
 //Email Server Settings
 const host = process.env.EMAIL_HOST;
 const port = parseInt(process.env.EMAIL_PORT);
-const secure = Boolean(process.env.EMAIL_SECURE);
+const secure = (process.env.EMAIL_SECURE === 'true');
 const username = process.env.EMAIL_USERNAME;
 const password = process.env.EMAIL_PASSWORD;
 
 // Other Settings
 var from = process.env.EMAIL_FROM;
 const subject = process.env.EMAIL_SUBJECT;
-const sendInterval = process.env.SEND_INTERVAL;
+const html = (process.env.EMAIL_HTML === 'true');
+const sendInterval = parseInt(process.env.SEND_INTERVAL);
+const batchSize = parseInt(process.env.BATCH_SIZE);
 
 var message = "";
 var receivers = [];
+var providers = {};
 
 var transporter;
 
@@ -35,70 +43,110 @@ console.log("\x1b[34m", "  Password: \x1b[35m********************\n");
 
 console.log("\x1b[32m", "Other Settings:\n");
 console.log("\x1b[34m", "  Send Interval: \x1b[35mEvery " + sendInterval + " seconds");
+console.log("\x1b[34m", "  HTML: \x1b[35m" + html);
+console.log("\x1b[34m", "  Debug: \x1b[35m" + debug);
+console.log("\x1b[34m", "  Batch Size: \x1b[35m" + batchSize);
 console.log("\x1b[34m", "  Email From: \x1b[35m" + from);
 console.log("\x1b[34m", "  Email Subject: \x1b[35m" + subject + "\n");
 
 from = '"' + from + '" ' + username;
 
-fs.readFile('./settings/message.txt', 'utf8', (err, data) => {
-	if(err){
-		console.log("\x1b[34m", "Error while trying to get message from settings/message.txt file!");
-		process.exit(1);
-	}
-	message = data;
+try{
+	message = await fs.readFile('./settings/message.txt', 'utf-8');
 	console.log("\x1b[32m", "Message:\n");
 	console.log("\x1b[35m" + message + "\n");
+}catch{
+	console.log("\x1b[34m", "Error while trying to get message from settings/message.txt file!");
+	process.exit(1);
+}
 
-	fs.readFile('./settings/receivers.txt', 'utf8', (err, data) => {
-		if(err){
-			console.log("\x1b[34m", "Error while trying to get receivers from settings/receivers.txt file!");
-			process.exit(1);
-		}
-		receivers = data.split('\n');
-		console.log("\x1b[32m", "Receivers (" + receivers.length + "):\n");
-		console.log("\x1b[35m" + receivers + "\n");
+try{
+	receivers = await fs.readFile('./settings/receivers.txt', 'utf-8');
+	receivers = receivers.split('\n');
+}catch{
+	console.log("\x1b[34m", "Error while trying to get receivers from settings/receivers.txt file!");
+	process.exit(1);
+}
 
-		transporter = nodemailer.createTransport({
-			host: host,
-			port: port,
-			secure: secure,
-			auth: {
-				user: username,
-				pass: password,
-			},
+let total = receivers.length;
+
+// Receiver filtering
+console.log("\x1b[32m", "Receivers:\n");
+console.log("\x1b[34m", "  Unfiltered: \x1b[35m" + total);
+receivers = receivers.filter(receiver => validator.isEmail(receiver)).map(email => email.toLowerCase());;
+console.log("\x1b[34m", "    - Invalid: \x1b[35m" + (total - receivers.length));
+total = receivers.length;
+receivers = [...new Set(receivers)];
+console.log("\x1b[34m", "    - Duplicates: \x1b[35m" + (total - receivers.length));
+console.log("\x1b[34m", "  Filtered: \x1b[35m" + receivers.length + "\n");
+
+// Providers
+console.log("\x1b[32m", "Providers:\n");
+receivers.forEach(receiver => {
+	let domain = receiver.split('@')[1];
+	if(!Array.isArray(providers[domain])) providers[domain] = [];
+	providers[domain].push(receiver);
+});
+
+Object.keys(providers).forEach(domain => {
+	console.log("\x1b[34m", "  " + domain + ": \x1b[35m" + providers[domain].length);
+});
+console.log('\n');
+
+transporter = nodemailer.createTransport({
+	host: host,
+	port: port,
+	secure: secure,
+	auth: {
+		user: username,
+		pass: password,
+	},
+});
+
+// Send Emails
+logger("Countdown initiated! Your emails are set to launch in just 10 seconds! 🚀", '90');
+await new Promise(resolve => setTimeout(resolve, 10000));
+
+Object.keys(providers).forEach(async domain => {
+	let addresses = providers[domain];
+	const totalBatches = Math.ceil(addresses.length / batchSize);
+
+	for (let i = 0; i < addresses.length; i += batchSize) {
+		const batch = addresses.slice(i, i + batchSize);
+
+		transporter.sendMail(getMailOptions(batch), (error, info) => {
+			if (error) {
+				logger(`Oops! Something went wrong while sending emails to ${batch.length} addresses hosted on ${domain} server. (${i / batchSize + 1}/${totalBatches})`, '31', error);
+			} else {
+				logger(`Successfully delivered emails to ${batch.length} addresses hosted on ${domain} server. (${i / batchSize + 1}/${totalBatches})`, '32', info.response);
+			}
 		});
 
-		console.log("\x1b[33m", "\nEmail Sender will start sending messages in 10 seconds.\n");
-		setTimeout(function() {
-			setInterval(function() {
-				sendEmail();
-			}, sendInterval*1000);
-		}, 10000);
-	});
+		await new Promise(resolve => setTimeout(resolve, sendInterval * 1000));
+	}
 
 });
 
-function sendEmail(){
-	if(typeof(receivers[0]) != 'undefined' || receivers[0] != null){
-		transporter.sendMail(getMailOptions(receivers[0]), function(error, info){
-			if (error){
-				console.log("\x1b[31m", "[" + new Date().toLocaleString() + "] Error: " + error);
-			}else{
-				console.log("\x1b[34m", "[" + new Date().toLocaleString() + "] Email to " + receivers[0] + " is sent!");
-				receivers.splice(0, 1);
-			}
-		});
+function logger(message, color, data){
+	if(debug && data !== undefined){
+		console.log("\x1b[" + color + "m", `[${new Date().toLocaleString()}] ${message}`, data);
 	}else{
-		console.log("\n\x1b[33m All emails has been sent.\n");
-		process.exit();
+		console.log("\x1b[" + color + "m", `[${new Date().toLocaleString()}] ${message}`);
 	}
 }
 
-function getMailOptions(receiver){
-	return mailOptions = {
+function getMailOptions(addresses){
+	let mailOptions = {
 		from: from,
-		to: receiver,
-		subject: subject,
-		text: message
+		bcc: addresses,
+		subject: subject
 	};
+
+	if(html){
+		mailOptions.html = message;
+	}else{
+		mailOptions.text = message;
+	}
+
+	return mailOptions;
 }
